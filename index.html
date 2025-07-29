@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Trip: A Northern Odyssey</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        /*
+            DESIGN SYSTEM: Jony Ive
+            PROJECT: The Trip
+            PALETTE: Slate, Mist, Amber, Parchment
+        */
+        :root {
+            --color-background: #1c1c1e; /* A deep, soft black. Not quite absolute. */
+            --color-panel-bg: rgba(44, 44, 46, 0.75); /* Translucent, like frosted glass. */
+            --color-text-primary: #F2F2F7; /* A gentle, off-white. */
+            --color-text-secondary: #AEAEB2; /* Subtler, for context. */
+            --color-accent: #FF9500; /* A warm, inviting amber. */
+            --color-accent-hover: #FFB340;
+            --color-separator: rgba(84, 84, 88, 0.65);
+
+            --font-family-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            
+            --border-radius: 18px;
+            --panel-width: 420px;
+
+            --transition-curve: cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-duration: 0.6s;
+            --flyto-duration: 1.5s; /* Master transition time */
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            background-color: var(--color-background);
+            font-family: var(--font-family-sans);
+            color: var(--color-text-primary);
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            background-color: var(--color-background);
+            z-index: 1;
+        }
+
+        /* Map tile filter - desaturated and muted for a melancholic, beautiful feel. */
+        .leaflet-tile-pane {
+            filter: grayscale(1) brightness(0.9) sepia(0.2) contrast(0.9);
+        }
+
+        .ui-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1000;
+            pointer-events: none; /* Allow map interaction by default */
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .panel {
+            position: absolute;
+            left: 30px;
+            width: var(--panel-width);
+            height: calc(100% - 60px);
+            max-height: 800px;
+            background: var(--color-panel-bg);
+            backdrop-filter: blur(25px) saturate(180%);
+            -webkit-backdrop-filter: blur(25px) saturate(180%);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--color-separator);
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.4);
+            pointer-events: all;
+            transform: translateX(-150%);
+            opacity: 0;
+            transition: transform var(--transition-duration) var(--transition-curve),
+                        opacity var(--transition-duration) var(--transition-curve);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .panel.visible {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        /* Intro Panel - The opening statement */
+        #intro-panel {
+            padding: 40px;
+            box-sizing: border-box;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #intro-panel h1 {
+            font-size: 2.8rem;
+            font-weight: 700;
+            margin: 0;
+            letter-spacing: -1.5px;
+            line-height: 1.1;
+        }
+        
+        #intro-panel h1 span {
+            color: var(--color-accent);
+        }
+
+        #intro-panel p {
+            font-size: 1.1rem;
+            color: var(--color-text-secondary);
+            max-width: 80%;
+            line-height: 1.6;
+            margin: 20px 0 40px 0;
+        }
+
+        .button {
+            display: inline-block;
+            background: var(--color-accent);
+            color: #000;
+            padding: 14px 32px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 1rem;
+            transition: background-color 0.3s var(--transition-curve), transform 0.3s var(--transition-curve);
+        }
+
+        .button:hover {
+            background-color: var(--color-accent-hover);
+            transform: scale(1.05);
+        }
+
+        /* Location Panel - The heart of the experience */
+        #location-panel {
+             display: flex;
+             flex-direction: column;
+        }
+
+        .location-image {
+            width: 100%;
+            height: 220px;
+            background-size: cover;
+            background-position: center;
+            flex-shrink: 0;
+            transition: background-image 0.5s ease-in-out;
+            border-bottom: 1px solid var(--color-separator);
+        }
+        
+        .location-content {
+            padding: 20px 30px 30px 30px;
+            flex-grow: 1;
+            overflow-y: auto;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.5s ease-out 0.3s, transform 0.5s ease-out 0.3s;
+        }
+
+        .panel.visible .location-content {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .location-content::-webkit-scrollbar { width: 5px; }
+        .location-content::-webkit-scrollbar-track { background: transparent; }
+        .location-content::-webkit-scrollbar-thumb { background: var(--color-separator); border-radius: 10px; }
+        .location-content::-webkit-scrollbar-thumb:hover { background: var(--color-text-secondary); }
+
+        .location-header h2 { font-size: 2rem; margin: 0 0 5px 0; font-weight: 700; letter-spacing: -1px; }
+        .location-header p { font-size: 1rem; color: var(--color-text-secondary); margin: 0; }
+        .location-description { font-size: 1rem; line-height: 1.7; margin: 25px 0; color: var(--color-text-secondary); }
+
+        .location-quote { border-left: 3px solid var(--color-accent); padding-left: 20px; margin: 25px 0; font-style: italic; }
+        .location-quote p { margin: 0; color: var(--color-text-primary); }
+        .location-quote span { display: block; margin-top: 10px; font-style: normal; color: var(--color-text-secondary); }
+
+        .location-nav {
+            margin-top: auto;
+            padding: 20px 30px;
+            border-top: 1px solid var(--color-separator);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .nav-button {
+            color: var(--color-accent);
+            text-decoration: none;
+            font-weight: 500;
+            padding: 8px 12px;
+            border-radius: 8px;
+            transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out, opacity 0.3s ease-in-out;
+            border: 1px solid transparent;
+        }
+        
+        .nav-button:hover { background-color: rgba(255, 149, 0, 0.1); }
+        .nav-button:active { transform: scale(0.98); }
+        
+        .nav-button.disabled {
+            color: var(--color-text-secondary);
+            pointer-events: none;
+            opacity: 0.5;
+        }
+
+        .leaflet-marker-icon {
+            transition: transform var(--transition-duration) var(--transition-curve),
+                        opacity var(--transition-duration) var(--transition-curve);
+        }
+
+        .custom-marker {
+            background-color: var(--color-panel-bg);
+            border: 2px solid var(--color-text-secondary);
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            transition: all 0.3s var(--transition-curve);
+            cursor: pointer;
+        }
+
+        .custom-marker:hover { transform: scale(1.5); border-color: var(--color-accent); }
+        .custom-marker.active { background-color: var(--color-accent); border-color: var(--color-text-primary); transform: scale(2); }
+        .custom-marker.active:hover { transform: scale(2.2); }
+
+        .leaflet-overlay-pane path {
+            stroke: var(--color-accent);
+            stroke-width: 3;
+            stroke-opacity: 0.7;
+            fill: none;
+            stroke-dasharray: 8, 8;
+            animation: dash-animate 20s linear infinite;
+        }
+
+        @keyframes dash-animate { to { stroke-dashoffset: -200; } }
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+
+    <div class="ui-container">
+        <div id="intro-panel" class="panel visible">
+            <h1>The Trip<span>.</span></h1>
+            <p>An interactive journey through the culinary heart of Northern England, following in the footsteps of Steve Coogan and Rob Brydon.</p>
+            <a href="#" id="begin-journey" class="button">Begin Journey</a>
+        </div>
+        <div id="location-panel" class="panel">
+            <div class="location-image" id="location-image"></div>
+            <div class="location-content">
+                <div class="location-header">
+                    <h2 id="location-title"></h2>
+                    <p id="location-region"></p>
+                </div>
+                <p class="location-description" id="location-description"></p>
+                <div class="location-quote">
+                    <p id="location-quote-text"></p>
+                    <span id="location-quote-source"></span>
+                </div>
+            </div>
+            <div class="location-nav">
+                <a href="#" id="prev-button" class="nav-button">← Previous Stop</a>
+                <a href="#" id="next-button" class="nav-button">Next Stop →</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+    
+    <script>
+        // ARCHITECT'S REFACTOR:
+        // 1. Encapsulated all logic in a DOMContentLoaded listener and initApp function to prevent global scope pollution and ensure DOM is ready.
+        // 2. Introduced `isTransitioning` state to lock UI during animations, preventing user-induced chaos.
+        // 3. Fixed animation race condition by clearing previous timeouts (`contentUpdateTimeout`) before creating a new one.
+        // 4. Refactored DOM updates into a dedicated `updatePanelContent` function for clarity and single responsibility.
+
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            const locations = [
+                { name: "The Inn at Whitewell", region: "Forest of Bowland, Lancashire", lat: 53.9570, lng: -2.5218, image: "https://images.unsplash.com/photo-1592235817344-99a3c1375949?q=80&w=1920&auto=format&fit=crop", description: "The journey begins at this historic inn, where the initial culinary assessments and Michael Caine impressions are served with equal measure.", quote: { text: "It's a beautiful day, it's a beautiful hotel. What could possibly go wrong?", source: "- Rob Brydon" } },
+                { name: "L'Enclume", region: "Cartmel, Cumbria", lat: 54.2023, lng: -2.9540, image: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=1920&auto=format&fit=crop", description: "A temple of modern British cuisine. Here, the food becomes as much a character as the protagonists, leading to discussions on foams, gels, and the very nature of a scallop.", quote: { text: "We rise at dawn and sleep... at dusk. It's not a small thing, it's a big thing.", source: "- Steve Coogan" } },
+                { name: "Holbeck Ghyll", region: "Windermere, Cumbria", lat: 54.4065, lng: -2.9410, image: "https://images.unsplash.com/photo-1567113463300-1027a73a3832?q=80&w=1920&auto=format&fit=crop", description: "Overlooking Lake Windermere, this hotel provides a backdrop for more introspective moments and a fateful photoshoot in Wordsworth's Cumbrian garb.", quote: { text: "You can't do a voice for more than 15 seconds, can you? It's like a little... spasm.", source: "- Rob Brydon" } },
+                { name: "The Yorke Arms", region: "Pateley Bridge, North Yorkshire", lat: 54.1085, lng: -1.7580, image: "https://images.unsplash.com/photo-1579846823326-39a758785834?q=80&w=1920&auto=format&fit=crop", description: "Deep in the Yorkshire Dales, the conversation turns to career paths and life choices. The Michelin-starred food provides a comforting counterpoint to the professional anxieties.", quote: { text: "Minor celebrities are ten a penny.", source: "- Steve Coogan" } },
+                { name: "Hipping Hall", region: "Kirkby Lonsdale, Lancashire", lat: 54.1800, lng: -2.6100, image: "https://images.unsplash.com/photo-1544025162-d76694265947?q=80&w=1920&auto=format&fit=crop", description: "A 15th-century hall that hosts one of the trip's most memorable scenes: a dramatic recitation from 'The Lady of Shalott' across the dining room.", quote: { text: "Gentlemen, to bed! For we rise at daybreak!", source: "- Rob Brydon" } },
+                { name: "Malham Cove", region: "Malham, North Yorkshire", lat: 54.0722, lng: -2.1585, image: "https://images.unsplash.com/photo-1596706246343-345331460337?q=80&w=1920&auto=format&fit=crop", description: "The journey's dramatic, geological climax. A vast limestone amphitheater where Steve receives a life-changing call, bringing the trip to a poignant end.", quote: { text: "You're just... looking at rocks.", source: "- Steve Coogan" } }
+            ];
+
+            // State and configuration variables are contained.
+            let currentStop = 0;
+            let isTransitioning = false;
+            let contentUpdateTimeout;
+            const markers = [];
+
+            // UI Elements, cached for performance and clarity.
+            const introPanel = document.getElementById('intro-panel');
+            const locationPanel = document.getElementById('location-panel');
+            const beginButton = document.getElementById('begin-journey');
+            const prevButton = document.getElementById('prev-button');
+            const nextButton = document.getElementById('next-button');
+
+            const locationImage = document.getElementById('location-image');
+            const locationTitle = document.getElementById('location-title');
+            const locationRegion = document.getElementById('location-region');
+            const locationDescription = document.getElementById('location-description');
+            const locationQuoteText = document.getElementById('location-quote-text');
+            const locationQuoteSource = document.getElementById('location-quote-source');
+
+            // The Map. The canvas for our journey.
+            const map = L.map('map', {
+                zoomControl: false,
+                attributionControl: false,
+            }).setView([54.2, -2.5], 8);
+            
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+            L.polyline(locations.map(loc => [loc.lat, loc.lng])).addTo(map);
+
+            function createIcon(isActive = false) {
+                return L.divIcon({ className: `custom-marker ${isActive ? 'active' : ''}`, iconSize: [16, 16], iconAnchor: [8, 8] });
+            }
+            
+            function updatePanelContent(location) {
+                locationImage.style.backgroundImage = `url(${location.image})`;
+                locationTitle.textContent = location.name;
+                locationRegion.textContent = location.region;
+                locationDescription.textContent = location.description;
+                locationQuoteText.textContent = `“${location.quote.text}”`;
+                locationQuoteSource.textContent = location.quote.source;
+                locationPanel.querySelector('.location-content').style.opacity = 1;
+            }
+
+            function showLocation(index) {
+                if (isTransitioning || index < 0 || index >= locations.length) return;
+                
+                isTransitioning = true;
+                currentStop = index;
+                const location = locations[index];
+
+                if (introPanel.classList.contains('visible')) {
+                    introPanel.classList.remove('visible');
+                    locationPanel.classList.add('visible');
+                }
+                
+                map.flyTo([location.lat, location.lng], 13, { animate: true, duration: 1.5 });
+                markers.forEach((m, i) => m.setIcon(createIcon(i === index)));
+                
+                // Clear any previous, unfinished update to prevent race conditions.
+                clearTimeout(contentUpdateTimeout);
+                
+                locationPanel.querySelector('.location-content').style.opacity = 0;
+                contentUpdateTimeout = setTimeout(() => {
+                    updatePanelContent(location);
+                }, 300);
+
+                // Update navigation buttons immediately for visual feedback.
+                prevButton.classList.toggle('disabled', index === 0);
+                nextButton.classList.toggle('disabled', index === locations.length - 1);
+                
+                // Unlock the UI after the longest transition (flyTo) is complete.
+                setTimeout(() => {
+                    isTransitioning = false;
+                }, 1500); // Corresponds to --flyto-duration
+            }
+
+            // Initialization logic.
+            locations.forEach((location, index) => {
+                const marker = L.marker([location.lat, location.lng], { icon: createIcon() }).addTo(map);
+                marker.on('click', () => showLocation(index));
+                markers.push(marker);
+            });
+
+            beginButton.addEventListener('click', (e) => { e.preventDefault(); showLocation(0); });
+            prevButton.addEventListener('click', (e) => { e.preventDefault(); showLocation(currentStop - 1); });
+            nextButton.addEventListener('click', (e) => { e.preventDefault(); showLocation(currentStop + 1); });
+        });
+    </script>
+
+</body>
+</html>
