@@ -289,6 +289,10 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
      crossorigin=""></script>
+    <link rel="stylesheet" href="vendor/maplibre/maplibre-gl.css"/>
+    <script src="vendor/maplibre/maplibre-gl-csp.js"></script>
+    <script src="vendor/maplibre/leaflet-maplibre-gl.js"></script>
+    <script src="vendor/warm-map/style.js"></script>
     
     <script>
         // ARCHITECT'S REFACTOR:
@@ -331,10 +335,17 @@
             // The Map. The canvas for our journey.
             const map = L.map('map', {
                 zoomControl: false,
-                attributionControl: false,
+                attributionControl: true,
             }).setView([54.2, -2.5], 8);
-            
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+
+            // Warm-paper basemap (worlds shared module): OpenFreeMap vector
+            // tiles via the MapLibre GL Leaflet bridge. Free, no API key.
+            maplibregl.setWorkerUrl('vendor/maplibre/maplibre-gl-csp-worker.js');
+            L.maplibreGL({
+                style: window.WARM_MAP_STYLE,
+                attribution: '<a href="https://openfreemap.org" target="_blank" rel="noopener noreferrer">OpenFreeMap</a> &copy; <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener noreferrer">OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>',
+                maxZoom: 19
+            }).addTo(map);
             L.polyline(locations.map(loc => [loc.lat, loc.lng])).addTo(map);
 
             function createIcon(isActive = false) {
