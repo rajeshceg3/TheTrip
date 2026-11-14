@@ -253,6 +253,25 @@
         }
 
         @keyframes dash-animate { to { stroke-dashoffset: -200; } }
+        /* Phone layout: leave a clear map above a readable, contained story. */
+        *, *::before, *::after { box-sizing: border-box; }
+        .location-content { min-height: 0; }
+        .nav-button { min-height: 44px; display: inline-flex; align-items: center; }
+        .nav-button:focus-visible, .button:focus-visible { outline: 3px solid var(--color-accent); outline-offset: 3px; }
+        .panel:not(.visible) { visibility: hidden; pointer-events: none; }
+        @media (max-width: 600px) {
+            .panel { left: 12px; width: calc(100% - 24px); max-width: 420px; }
+            #intro-panel { height: min(520px, calc(100% - 80px)); padding: 28px 24px; }
+            #intro-panel p { max-width: 100%; }
+            #location-panel { bottom: 32px; height: min(56dvh, 500px); max-height: calc(100% - 96px); }
+            .location-image { height: 120px; }
+            .location-content { padding: 16px 20px 20px; }
+            .location-header h2 { font-size: 1.6rem; letter-spacing: -.5px; }
+            .location-description, .location-quote { margin: 18px 0; }
+            .location-nav { padding: 8px 10px; gap: 4px; }
+            .nav-button { font-size: 14px; padding: 8px; }
+            .leaflet-control-attribution { max-width: calc(100vw - 16px); font-size: 10px; }
+        }
     </style>
 </head>
 <body>
@@ -265,7 +284,7 @@
             <p>An interactive journey through the culinary heart of Northern England, following in the footsteps of Steve Coogan and Rob Brydon.</p>
             <a href="#" id="begin-journey" class="button">Begin Journey</a>
         </div>
-        <div id="location-panel" class="panel">
+        <div id="location-panel" class="panel" inert>
             <div class="location-image" id="location-image"></div>
             <div class="location-content">
                 <div class="location-header">
@@ -371,10 +390,19 @@
 
                 if (introPanel.classList.contains('visible')) {
                     introPanel.classList.remove('visible');
+                    introPanel.inert = true;
                     locationPanel.classList.add('visible');
+                    locationPanel.inert = false;
                 }
                 
-                map.flyTo([location.lat, location.lng], 13, { animate: true, duration: 1.5 });
+                let viewCenter = L.latLng(location.lat, location.lng);
+                if (matchMedia('(max-width: 600px)').matches) {
+                    // Keep the selected stop in the visible map above the phone sheet.
+                    const storyTop = innerHeight - Math.min(innerHeight * .56, 500) - 32;
+                    const offset = map.getSize().y / 2 - storyTop / 2;
+                    viewCenter = map.unproject(map.project(viewCenter, 13).add([0, offset]), 13);
+                }
+                map.flyTo(viewCenter, 13, { animate: true, duration: 1.5 });
                 markers.forEach((m, i) => m.setIcon(createIcon(i === index)));
                 
                 // Clear any previous, unfinished update to prevent race conditions.
